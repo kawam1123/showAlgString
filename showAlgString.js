@@ -78,7 +78,7 @@ function generateAlgString(sheet, targetCell, option){
 
 var alg = targetCell.getValue(); //アルゴリズムの文字列を取得する　例： [U', R' D' R]
 //var buffer = 'UFR' //バッファを指定する。とりあえず固定値。
-var buffer = sheet.getName().replace('Corners','').replace('Edges','').replace('corners','').replace('edges','').replace(' ',''); //シート名にバッファが書いてあると信じてシート名を取得、cornersやedgesは消去
+var buffer = sheet.getName().replace('Corners','').replace('Edges','').replace('corners','').replace('edges','').replace('Comms','').replace(' ',''); //シート名にバッファが書いてあると信じてシート名を取得、cornersやedgesは消去
 var sticker_2nd = sheet.getRange(1, targetCell.getColumn()).getValue(); //例："み (RDF)"
 var sticker_3rd = sheet.getRange(targetCell.getRow(), 1).getValue(); //例："い (UFL)"
 
