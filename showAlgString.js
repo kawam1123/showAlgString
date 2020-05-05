@@ -1,5 +1,5 @@
 //Name: showAlgString.js
-//Version: 1.4 (2020/05/05)
+//Version: 1.4 (2020/04/26)
 //Author: kawam1123
 
 function onOpen() {
@@ -161,7 +161,7 @@ function showAlgDecompressionSimple(inputString = "[U', R' D R]"){
   }
   Logger.log(output);
   //showOutputString(output); 
-  return output;
+  return cancellation(output);
 }
 
 function reverseAlg(input){
@@ -194,10 +194,47 @@ function reverseMove(move){
 
 function decompressComm(move){
   //「R U R', D」のような文字列を期待する
-  arr=move.split(", ");
-  arr.push(reverseAlg(arr[0]));
-  arr.push(reverseAlg(arr[1]));
-  output=arr.join(" ");
+  comm_arr=move.split(", ");
+  comm_arr.push(reverseAlg(comm_arr[0]));
+  comm_arr.push(reverseAlg(comm_arr[1]));
+  output=comm_arr.join(" ");
   Logger.log([move,output]);
-  return output;  
+  return output;
+  
+}
+
+function cancellation(move="U' D R' R D R U2 R' D' R R' D' U"){
+  //展開したときのキャンセル処理を行う
+  
+  output = move.replace(/(\w{1,2})\'\s\1(\s|\>)/g, '').replace(/(\w{1,2})\s\1\'(\s|\>)/g, '');  //U U' ,U' U -> null
+  output = output.replace(/(\w{1,2})(\'?)\s+\1\2(\s|\>)/g, '$12 '); // U U -> U2
+  output = output.replace(/(\w{1,2})\'+\s+(\1)2(\s|\>)/g,'$1 '); //D' D2 -> D, U' U2 = -> U
+  output = output.replace(/(\w{1,2})\s+(\1)2(\s|\>)/g,'$1\' '); //D D2 -> D', U U2 = -> U'
+  
+  
+  //|(\w{1,2})\'\s(\4)(\s|\>)
+  /*
+  cancel_arr=move.split(" ");
+  var converted　= new Array();
+  for (var i = 1, len = cancel_arr.length; i < len; ++i) {
+    var lastLetter = cancel_arr[i].slice(-1); //符号を取得
+    if(lastLetter == "'"){
+      converted[i][0] = cancel_arr[i].slice(0,-1);
+      converted[i][1] = -1;
+    }else if(lastLetter == "2"){
+      converted[i][0] = cancel_arr[i].slice(0,-1);
+      converted[i][1] = 2;
+    }else{
+      converted[i][0] = cancel_arr[i];
+      converted[i][1] = 1;
+    }
+  }
+  
+  for (var i = 1, len = converted.length; i < len; ++i) {
+    
+  }*/
+  
+  
+  //output = move + "\\n" + output;
+  return output;
 }
