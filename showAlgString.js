@@ -1,5 +1,5 @@
 //Name: showAlgString.js
-//Version: 1.4 (2020/04/26)
+//Version: 1.4 (2020/05/05)
 //Author: kawam1123
 
 function onOpen() {
