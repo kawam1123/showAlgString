@@ -167,7 +167,7 @@ function showAlgDecompressionSimple(inputString = "[U D: [D' R D R', F2]]"){
   decom_output = recur_cancel(output);//キャンセル処理
   Logger.log("decom_output: ", decom_output);
   //showOutputString(output); 
-  return output;
+  return decom_output;
 }
 
 function reverseAlg(alg){
@@ -271,7 +271,8 @@ function recur_cancel(alg="U D D' D2 U U' D R F Dw Dw' F F F"){
           break;
         default:
       }
-        
+    
+    
     len = alg_array.length;//配列の長さを再計算
     reset_flag = 1;//リセットフラグを立てる
     }//if end
