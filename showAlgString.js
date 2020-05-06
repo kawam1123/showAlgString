@@ -1,5 +1,5 @@
 //Name: showAlgString.js
-//Version: 1.4 (2020/05/05)
+//Version: 1.5 (2020/05/06)
 //Author: kawam1123
 
 function onOpen() {
@@ -103,6 +103,11 @@ function generateAlgString(sheet, targetCell, format, decompress=false, decomonl
 
   var alg = targetCell.getValue(); //アルゴリズムの文字列を取得する　例： [U', R' D' R]
   
+  //空白セルなら処理しない
+  if(alg==""){
+    return "";
+  }
+  
   if(decomonly){//展開のみオプションが有効であるならば、展開のみ出力
     output = showAlgDecompressionSimple(alg);
     console.log("出力文字列(decomonly)："+output+"\n");
@@ -146,10 +151,10 @@ function showOutputString(outputString){
   Browser.msgBox(outputString)   
 }
 
-function showAlgDecompressionSimple(inputString = "[U', R' D R]"){
-  //inputString = showAlgStringsRange(format=3);
+function showAlgDecompressionSimple(inputString = "[U D: [D' R D R', F2]]"){
   if(inputString.match(/\:/)){ //セットアップあり
-    str = inputString.replace(/(\[|\]|\n)/g,"").split(": ");
+    str = inputString.replace(/(\[|\]|\n)/g,"").split(": ");//カッコと改行を削除
+    Logger.log("[str[0], str[1]]= ",str[0],"/",str[1]);
     var decom = [str[0], decompressComm(str[1]), reverseAlg(str[0])];
     output = decom.join(" ");
     Logger.log("decom: ",decom);
@@ -159,9 +164,10 @@ function showAlgDecompressionSimple(inputString = "[U', R' D R]"){
   }else{ //特殊手順
     output = inputString.replace(/(\[|\]|\n)/g,"");
   }
-  Logger.log(output);
-  //showOutputString(output); 
-  return cancellation(output);
+  output = cancellation(output);
+  Logger.log("output: ", output);
+  showOutputString(output); 
+  return output;
 }
 
 function reverseAlg(input){
@@ -182,24 +188,23 @@ function reverseMove(move){
     //D' -> D
     lastLetter = move.slice(-1);
     if(lastLetter == "'"){
-      output = move.replace("'","");
+      reversed_string = move.replace("'","");
     }else if(lastLetter == "2"){
-      //do nothing
+      reversed_string = move; //do nothing
     }else{
-      output = move + "'";
+      reversed_string = move + "'";
     }
-  //Logger.log([move,output]);
-    return output;
+    return reversed_string;
 }
 
-function decompressComm(move){
+function decompressComm(move="D' R D R', F2"){
   //「R U R', D」のような文字列を期待する
   comm_arr=move.split(", ");
   comm_arr.push(reverseAlg(comm_arr[0]));
   comm_arr.push(reverseAlg(comm_arr[1]));
-  output=comm_arr.join(" ");
-  Logger.log([move,output]);
-  return output;
+  decom_output=comm_arr.join(" ");
+  Logger.log("[original_move,decom_output]=",move,"/",decom_output);
+  return decom_output;
   
 }
 
@@ -210,31 +215,6 @@ function cancellation(move="U' D R' R D R U2 R' D' R R' D' U"){
   output = output.replace(/(\w{1,2})(\'?)\s+\1\2(\s|\>)/g, '$12 '); // U U -> U2
   output = output.replace(/(\w{1,2})\'+\s+(\1)2(\s|\>)/g,'$1 '); //D' D2 -> D, U' U2 = -> U
   output = output.replace(/(\w{1,2})\s+(\1)2(\s|\>)/g,'$1\' '); //D D2 -> D', U U2 = -> U'
-  
-  
-  //|(\w{1,2})\'\s(\4)(\s|\>)
-  /*
-  cancel_arr=move.split(" ");
-  var converted　= new Array();
-  for (var i = 1, len = cancel_arr.length; i < len; ++i) {
-    var lastLetter = cancel_arr[i].slice(-1); //符号を取得
-    if(lastLetter == "'"){
-      converted[i][0] = cancel_arr[i].slice(0,-1);
-      converted[i][1] = -1;
-    }else if(lastLetter == "2"){
-      converted[i][0] = cancel_arr[i].slice(0,-1);
-      converted[i][1] = 2;
-    }else{
-      converted[i][0] = cancel_arr[i];
-      converted[i][1] = 1;
-    }
-  }
-  
-  for (var i = 1, len = converted.length; i < len; ++i) {
-    
-  }*/
-  
-  
-  //output = move + "\\n" + output;
+
   return output;
 }
