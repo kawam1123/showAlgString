@@ -164,15 +164,15 @@ function showAlgDecompressionSimple(inputString = "[U D: [D' R D R', F2]]"){
   }else{ //特殊手順
     output = inputString.replace(/(\[|\]|\n)/g,"");
   }
-  output = cancellation(output);
-  Logger.log("output: ", output);
-  showOutputString(output); 
+  decom_output = recur_cancel(output);//キャンセル処理
+  Logger.log("decom_output: ", decom_output);
+  //showOutputString(output); 
   return output;
 }
 
-function reverseAlg(input){
+function reverseAlg(alg){
 //手順を逆手順に変換する
-  reversed = input.split(' ').reverse();
+  reversed = alg.split(' ').reverse();
   for (var i = 0, len = reversed.length; i < len; ++i) {
     reversed[i] = reverseMove(reversed[i]);
   }
@@ -197,24 +197,94 @@ function reverseMove(move){
     return reversed_string;
 }
 
-function decompressComm(move="D' R D R', F2"){
+function decompressComm(alg="D' R D R', F2"){
   //「R U R', D」のような文字列を期待する
-  comm_arr=move.split(", ");
+  comm_arr=alg.split(", ");
   comm_arr.push(reverseAlg(comm_arr[0]));
   comm_arr.push(reverseAlg(comm_arr[1]));
-  decom_output=comm_arr.join(" ");
-  Logger.log("[original_move,decom_output]=",move,"/",decom_output);
-  return decom_output;
+  comm_output=comm_arr.join(" ");
+  Logger.log("[original_move,comm_output]=",alg,"/",comm_output);
+  return comm_output;
   
 }
 
-function cancellation(move="U' D R' R D R U2 R' D' R R' D' U"){
-  //展開したときのキャンセル処理を行う
+function recur_cancel(alg="U D D' D2 U U' D R F Dw Dw' F F F"){
+  //入力した文字列に対して再帰的にキャンセル処理をする。
+  alg_array = alg.split(" ");
+  re_move = /[UDFBLRwxyzudfblr]{1,2}/;
+  reset_flag = 0;
   
-  output = move.replace(/(\w{1,2})\'\s\1(\s|\>)/g, '').replace(/(\w{1,2})\s\1\'(\s|\>)/g, '');  //U U' ,U' U -> null
-  output = output.replace(/(\w{1,2})(\'?)\s+\1\2(\s|\>)/g, '$12 '); // U U -> U2
-  output = output.replace(/(\w{1,2})\'+\s+(\1)2(\s|\>)/g,'$1 '); //D' D2 -> D, U' U2 = -> U
-  output = output.replace(/(\w{1,2})\s+(\1)2(\s|\>)/g,'$1\' '); //D D2 -> D', U U2 = -> U'
-
-  return output;
+  //すべてのムーブを順に走査する。
+  for (var i = 0, len = alg_array.length; i < len-1; ++i) {
+    Logger.log("alg_array:",alg_array);
+    Logger.log("target move, i = :",alg_array[i], i);
+    var moveType1st = alg_array[i].match(re_move).toString(); //ムーブの回転面を取得
+    var moveType2nd = alg_array[i+1].match(re_move).toString(); //ムーブの回転面を取得
+    Logger.log("1st/2nd =", moveType1st, "/", moveType2nd);
+    if (moveType1st==moveType2nd){//後のムーブの回転面が一致するならば
+      Logger.log("match! : ", moveType1st);
+      
+      switch(alg_array[i].slice(-1)){//ムーブの符号を取得
+        case "'":
+          moveSign = 3;
+          break;
+        case "2":
+          moveSign = 2;
+          break;
+        default:
+          moveSign = 1;        
+      }
+      
+      switch(alg_array[i+1].slice(-1)){
+        case "'":
+          moveSign += 3;
+          break;
+        case "2":
+          moveSign += 2;
+          break;
+        default:
+          moveSign += 1;
+      }
+      
+      //符号を計算する
+      Logger.log("sign:",moveSign);
+      switch(moveSign % 4){
+        case 1:
+          alg_array[i] = moveType1st; // U
+          alg_array.splice(i+1,1);//i+1を削除
+          i-=1;//配列のイテレータを1つ戻す
+          break;
+        case 2:
+          alg_array[i] = moveType1st + "2" ; // U2
+          alg_array.splice(i+1,1);//i+1を削除
+          i-=1;//配列のイテレータを1つ戻す
+          break;
+        case 3:
+          alg_array[i] = moveType1st + "'" ; // U'
+          alg_array.splice(i+1,1);//i+1を削除
+          i-=1;//配列のイテレータを1つ戻す
+          len = alg_array.length;
+          break;
+        case 0:
+          alg_array.splice(i,2);//2つとも削除
+          i-=1;//配列のイテレータを2つ戻す
+          break;
+        default:
+      }
+        
+    len = alg_array.length;//配列の長さを再計算
+    reset_flag = 1;//リセットフラグを立てる
+    }//if end
+    
+    //最後に達したとき、リセットフラグが立っているならば、最初から配列を走査する
+    if(i==len-2 && reset_flag==1) {
+      Logger.log("reset!");
+      i=0;
+      reset_flag=0;
+    }
+    
+  }//for end
+  //DecompressedOutput = "Original, Decompressed :\\n"+alg+"\\n"+alg_array.join(" ");
+  //showOutputString(DecompressedOutput); 
+  return alg_array.join(" ");
 }
