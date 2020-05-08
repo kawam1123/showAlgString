@@ -1,5 +1,5 @@
 //Name: showAlgString.js
-//Version: 1.5 (2020/05/06)
+//Version: 1.6.1 (2020/05/09)
 //Author: kawam1123
 
 function onOpen() {
@@ -123,7 +123,7 @@ function generateAlgString(sheet, targetCell, format, decompress=false, decomonl
     var output = buffer + ' ' + getSticker(sticker_2nd)[0] + ' ' + getSticker(sticker_3rd)[0] + ' ' + alg; //例： UFR RDF UFL
   }else{//もしレターペアつきの手順表ならば
     var letters = getSticker(sticker_2nd)[0]+getSticker(sticker_3rd)[0]; //レターペアのみ取り出す　例："みい"
-    var output_alg = buffer + ' ' + getSticker(sticker_2nd)[1] + ' ' + getSticker(sticker_3rd)[1] + ' ' + alg; //例： UFR RDF UFL
+    var output_alg = buffer + '-' + getSticker(sticker_2nd)[1] + '-' + getSticker(sticker_3rd)[1] + ' ' + alg; //例： UFR RDF UFL
     
     //出力形式で分岐
     if(format==1) var output = letters+' '+output_alg; //例："みい UFR RDF UFL [U', R' D' R]"
@@ -208,7 +208,43 @@ function decompressComm(alg="D' R D R', F2"){
   
 }
 
-function recur_cancel(alg="U D D' D2 U U' D R F Dw Dw' F F F"){
+function getMoveType(move="D"){
+  //入力したムーブについて回転面、回転軸、符号を出力する
+  //出力は連想配列moveType
+  var moveType = {};
+  re_move = /[UDFBLRESMwxyzudfblr]{1,2}/;
+  moveType.move = move;
+  //回転面を取得
+  moveType.moveString = move.match(re_move).toString(); // U
+  
+  //回転軸を取得 : UD ,FB, RLのいずれか
+  switch(moveType.moveString){
+    case "U": case "D": case "Uw": case "Dw": case "y": case "E":
+      moveType.moveAxis = "UD"; //UD軸
+      break;
+    case "F": case "B": case "Fw": case "Bw": case "z": case "S":
+      moveType.moveAxis = "FB"; //FB軸
+      break;
+    case "R": case "L": case "Rw": case "Lw": case "x": case "M":
+      moveType.moveAxis = "FB"; //FB軸
+      break;
+  }
+  
+  //符号を取得 : (U)1, (U2)2, U'=3
+  switch(moveType.move.slice(-1)){//ムーブの符号を取得
+    case "'":
+      moveType.moveSign = 3;
+      break;
+    case "2":
+      moveType.moveSign = 2;
+      break;
+    default:
+      moveType.moveSign = 1;        
+  }
+  return moveType;
+}
+
+function recur_cancel(alg="U D D2 U U D R F Dw Dw' F F F"){
   //入力した文字列に対して再帰的にキャンセル処理をする。
   alg_array = alg.split(" ");
   re_move = /[UDFBLRwxyzudfblr]{1,2}/;
@@ -218,49 +254,40 @@ function recur_cancel(alg="U D D' D2 U U' D R F Dw Dw' F F F"){
   for (var i = 0, len = alg_array.length; i < len-1; ++i) {
     Logger.log("alg_array:",alg_array);
     Logger.log("target move, i = :",alg_array[i], i);
-    var moveType1st = alg_array[i].match(re_move).toString(); //ムーブの回転面を取得
-    var moveType2nd = alg_array[i+1].match(re_move).toString(); //ムーブの回転面を取得
-    Logger.log("1st/2nd =", moveType1st, "/", moveType2nd);
-    if (moveType1st==moveType2nd){//後のムーブの回転面が一致するならば
-      Logger.log("match! : ", moveType1st);
-      
-      switch(alg_array[i].slice(-1)){//ムーブの符号を取得
-        case "'":
-          moveSign = 3;
-          break;
-        case "2":
-          moveSign = 2;
-          break;
-        default:
-          moveSign = 1;        
-      }
-      
-      switch(alg_array[i+1].slice(-1)){
-        case "'":
-          moveSign += 3;
-          break;
-        case "2":
-          moveSign += 2;
-          break;
-        default:
-          moveSign += 1;
-      }
-      
+
+    // ムーブの情報を取得する。
+    var targetMove = getMoveType(alg_array[i]);   //1つ目のムーブの情報を取得
+    var nextMove   = getMoveType(alg_array[i+1]); //2つ目のムーブの情報を取得
+
+    // 後続のムーブと回転軸が一致するかを確認する。
+    if (targetMove.moveAxis==nextMove.moveAxis){//後のムーブの回転軸が一致するならば
+      //残りの連続するムーブに回転軸が異なる手順が出現するまで走査する
+      var scanAxis = "";
+      for (var j = i+2, len = alg_array.length; j < len; ++j) {
+        if(getMoveType(alg_array[j]).moveAxis != targetMove.moveAxis) break;
+      }//breakしたとき、i～j-1まで符号が一致したことを示す
+    }
+    
+    // 後続のムーブと回転面が一致するかを確認する。
+    if (targetMove.moveString==nextMove.moveString){//後のムーブの回転面が一致するならば
+      Logger.log("match! moveType: ", targetMove.moveString);
+
       //符号を計算する
-      Logger.log("sign:",moveSign);
-      switch(moveSign % 4){
+      var totalSign = targetMove.moveSign + nextMove.moveSign;
+      Logger.log("sign:",totalSign);
+      switch(totalSign % 4){
         case 1:
-          alg_array[i] = moveType1st; // U
+          alg_array[i] = targetMove.moveString; // U
           alg_array.splice(i+1,1);//i+1を削除
           i-=1;//配列のイテレータを1つ戻す
           break;
         case 2:
-          alg_array[i] = moveType1st + "2" ; // U2
+          alg_array[i] = targetMove.moveString + "2" ; // U2
           alg_array.splice(i+1,1);//i+1を削除
           i-=1;//配列のイテレータを1つ戻す
           break;
         case 3:
-          alg_array[i] = moveType1st + "'" ; // U'
+          alg_array[i] = targetMove.moveString + "'" ; // U'
           alg_array.splice(i+1,1);//i+1を削除
           i-=1;//配列のイテレータを1つ戻す
           len = alg_array.length;
@@ -285,7 +312,7 @@ function recur_cancel(alg="U D D' D2 U U' D R F Dw Dw' F F F"){
     }
     
   }//for end
-  //DecompressedOutput = "Original, Decompressed :\\n"+alg+"\\n"+alg_array.join(" ");
-  //showOutputString(DecompressedOutput); 
+  DecompressedOutput = "Original, Decompressed :\\n"+alg+"\\n"+alg_array.join(" ");
+  showOutputString(DecompressedOutput); 
   return alg_array.join(" ");
 }
