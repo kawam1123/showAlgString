@@ -53,10 +53,13 @@ function showAlgStringMinwithDecomOnly(){
 }
 
 function showAlgStringsRange(format=1,decompress=false,decomonly=false){
+  label="showAlgStringRange";
+  console.time("showAlgStringRange");
   //複数の選択された範囲について、文字列を取得し、メッセージを出す
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   var sheet=spreadsheet.getActiveSheet();
   var targets = sheet.getActiveRangeList().getRanges(); //選択されたセルのリストを取得
+  var buffer = sheet.getName().replace('Corners','').replace('Edges','').replace('corners','').replace('edges','').replace(' ',''); //シート名にバッファが書いてあると信じてシート名を取得、cornersやedgesは消去
   console.log("処理開始");
   
   //出力文字列を初期化する
@@ -66,19 +69,21 @@ function showAlgStringsRange(format=1,decompress=false,decomonly=false){
     //選択された複数の範囲についてループ処理する
     //複数の範囲がある場合、それぞれの出力結果の間には空行を挿入する
     console.log("次の範囲を処理する："+targets[target].getA1Notation());
-    outputString　+= getAlgString(sheet,targets[target],format,decompress,decomonly) + "\\n"
+    outputString　+= getAlgString(sheet,targets[target],buffer,format,decompress,decomonly) + "\\n"
   }
-  
+  console.timeEnd("showAlgStringRange");
   return outputString;
 }
 
-function getAlgString(sheet, target, format, decompress=false, decomonly=false) {
+function getAlgString(sheet, target, buffer, format, decompress=false, decomonly=false) {
 //範囲内で全てのセルについて処理をする
 //formatで出力形式を変える
 //  1:レターペア、ステッカー、手順 例："みい UFR RDF UFL [U', R' D' R]"
 //  2:ステッカー、手順 例："UFR RDF UFL [U', R' D' R]"
 //  3:手順 例："[U', R' D' R]"
 //  targetはRangeである。Range内には複数の手順が含まれている場合がある。
+  label="showAlgString";
+  console.time(label);
   //出力文字列を初期化する
   outputString = "";
   //Rangeの範囲内を繰り返し処理する
@@ -88,17 +93,16 @@ function getAlgString(sheet, target, format, decompress=false, decomonly=false) 
       targetCellValue = targetCell.getValue(); //各セルの文字列を取得する
       console.log("処理対象："+targetCellValue+"\n");
       if(targetCellValue){//空白文字でないなら処理する
-        console.log("個別セルの処理に入る");
-        outputString += generateAlgString(sheet, targetCell, format, decompress, decomonly) + '\\n'
+        outputString += generateAlgString(sheet, targetCell, buffer, format, decompress, decomonly) + '\\n'
       }
     }
   }
- 
+  console.timeEnd(label);
   return outputString  
 }
 
 
-function generateAlgString(sheet, targetCell, format, decompress=false, decomonly){
+function generateAlgString(sheet, targetCell, buffer, format, decompress=false, decomonly){
 //特定のセルtargetCell(Range)を与えると出力用の文字列を生成する
 
   var alg = targetCell.getValue(); //アルゴリズムの文字列を取得する　例： [U', R' D' R]
@@ -114,8 +118,7 @@ function generateAlgString(sheet, targetCell, format, decompress=false, decomonl
     return output;
   }
   
-  //var buffer = 'UFR' //バッファを指定する。とりあえず固定値。
-  var buffer = sheet.getName().replace('Corners','').replace('Edges','').replace('corners','').replace('edges','').replace(' ',''); //シート名にバッファが書いてあると信じてシート名を取得、cornersやedgesは消去
+  //var buffer = sheet.getName().replace('Corners','').replace('Edges','').replace('corners','').replace('edges','').replace(' ',''); //シート名にバッファが書いてあると信じてシート名を取得、cornersやedgesは消去
   var sticker_2nd = sheet.getRange(1, targetCell.getColumn()).getValue(); //例："み (RDF)"
   var sticker_3rd = sheet.getRange(targetCell.getRow(), 1).getValue(); //例："い (UFL)"
   
@@ -126,9 +129,11 @@ function generateAlgString(sheet, targetCell, format, decompress=false, decomonl
     var output_alg = buffer + '-' + getSticker(sticker_2nd)[1] + '-' + getSticker(sticker_3rd)[1] + ' ' + alg; //例： UFR RDF UFL
     
     //出力形式で分岐
-    if(format==1) var output = letters+' '+output_alg; //例："みい UFR RDF UFL [U', R' D' R]"
-    if(format==2) var output = output_alg; //例："UFR RDF UFL [U', R' D' R]"
-    if(format==3) var output = alg; //例："[U', R' D' R]"
+    switch(format){
+      case 1: var output = letters+' '+output_alg; break; //例："みい UFR RDF UFL [U', R' D' R]"
+      case 2: var output = output_alg; break; //例："UFR RDF UFL [U', R' D' R]"
+      case 3: var output = alg; break; //例："[U', R' D' R]"
+    }
   }
   
   if(decompress){ //コミューテータ表記の展開オプションが有効であるならば
@@ -152,6 +157,7 @@ function showOutputString(outputString){
 }
 
 function showAlgDecompressionSimple(inputString = "[U D: [D' R D R', F2]]"){
+  //console.time("showAlgDecompressionSimple");
   if(inputString.match(/\:/)){ //セットアップあり
     str = inputString.replace(/(\[|\]|\n)/g,"").split(": ");//カッコと改行を削除
     Logger.log("[str[0], str[1]]= ",str[0],"/",str[1]);
@@ -165,8 +171,9 @@ function showAlgDecompressionSimple(inputString = "[U D: [D' R D R', F2]]"){
     output = inputString.replace(/(\[|\]|\n)/g,"");
   }
   decom_output = recur_cancel(output);//キャンセル処理
-  Logger.log("decom_output: ", decom_output);
+  //Logger.log("decom_output: ", decom_output);
   //showOutputString(output); 
+  //console.timeEnd("showAlgDecompressionSimple");
   return decom_output;
 }
 
@@ -203,7 +210,7 @@ function decompressComm(alg="D' R D R', F2"){
   comm_arr.push(reverseAlg(comm_arr[0]));
   comm_arr.push(reverseAlg(comm_arr[1]));
   comm_output=comm_arr.join(" ");
-  Logger.log("[original_move,comm_output]=",alg,"/",comm_output);
+  //Logger.log("[original_move,comm_output]=",alg,"/",comm_output);
   return comm_output;
   
 }
@@ -296,6 +303,7 @@ function calcTotalSign(
 
 function recur_cancel(alg="U D U U D R x x' R' F F' F M' Rw U R U M' Rw"){
   //入力した文字列に対して再帰的にキャンセル処理をする。
+  //console.time("recur_cancel");
   alg_array = alg.split(" ");
   reset_flag = 0;
   
@@ -306,8 +314,8 @@ function recur_cancel(alg="U D U U D R x x' R' F F' F M' Rw U R U M' Rw"){
     
   //すべてのムーブを順に走査する。
   for (var i = 0; i < len-1; ++i) {
-    Logger.log("alg_array:",alg_array);
-    Logger.log("target move, i = :",alg_array[i], i);
+    //Logger.log("alg_array:",alg_array);
+    //Logger.log("target move, i = :",alg_array[i], i);
 
     // ムーブの情報を取得する。
     var targetMove = getMoveType(alg_array[i]);   //1つ目のムーブの情報を取得
@@ -323,7 +331,7 @@ function recur_cancel(alg="U D U U D R x x' R' F F' F M' Rw U R U M' Rw"){
       if(getMoveType(alg_array[j]).moveAxis != targetMove.moveAxis || getMoveType(alg_array[j]).isRotation) break;
     }
     
-    Logger.log("breakpoint:",i,j,alg_array.slice(i,j));
+    //Logger.log("breakpoint:",i,j,alg_array.slice(i,j));
     
     //回転軸が一致するムーブがあるなら、処理を継続する。
     if(i != j-1) {
@@ -341,7 +349,7 @@ function recur_cancel(alg="U D U U D R x x' R' F F' F M' Rw U R U M' Rw"){
       
       //イテレータを増加あるいは初期化
       replaceLenAfter = replacedArray.length;
-      Logger.log("replaceLen,replaceLenAfter",replaceLen, replaceLenAfter);
+      //Logger.log("replaceLen,replaceLenAfter",replaceLen, replaceLenAfter);
       i += replaceLenAfter -1;
       
       //配列の長さを再計算
@@ -358,5 +366,6 @@ function recur_cancel(alg="U D U U D R x x' R' F F' F M' Rw U R U M' Rw"){
   //debug_output
   //DecompressedOutput = "Original, Decompressed :\\n"+alg+"\\n"+alg_array.join(" ");
   //showOutputString(DecompressedOutput); 
+  console.timeEnd("recur_cancel");
   return alg_array.join(" ");
 }
