@@ -1,5 +1,5 @@
 //Name: showAlgString.js
-//Version: 1.6.1 (2020/05/09)
+//Version: 1.5.2 (2020/05/09)
 //Author: kawam1123
 
 function onOpen() {
@@ -210,13 +210,13 @@ function decompressComm(alg="D' R D R', F2"){
 
 function getMoveType(move="D"){
   //入力したムーブについて回転面、回転軸、符号を出力する
-  //出力は連想配列moveType
+  //出力は連想配列moveType=[moveString,moveAxis,moveSign] //例 ["U","UD",1] ["F","FB",3]
   var moveType = {};
   re_move = /[UDFBLRESMwxyzudfblr]{1,2}/;
   moveType.move = move;
   //回転面を取得
   moveType.moveString = move.match(re_move).toString(); // U
-  
+  moveType.isRotation = moveType.moveString.match(/[xyz]/) ? true : false;
   //回転軸を取得 : UD ,FB, RLのいずれか
   switch(moveType.moveString){
     case "U": case "D": case "Uw": case "Dw": case "y": case "E":
@@ -226,7 +226,7 @@ function getMoveType(move="D"){
       moveType.moveAxis = "FB"; //FB軸
       break;
     case "R": case "L": case "Rw": case "Lw": case "x": case "M":
-      moveType.moveAxis = "FB"; //FB軸
+      moveType.moveAxis = "RL"; //RL軸
       break;
   }
   
@@ -241,78 +241,122 @@ function getMoveType(move="D"){
     default:
       moveType.moveSign = 1;        
   }
+  //Logger.log("moveType:",moveType.moveString, moveType.moveAxis, moveType.moveSign);
   return moveType;
 }
 
-function recur_cancel(alg="U D D2 U U D R F Dw Dw' F F F"){
+function calcTotalSign(
+  moveTypeArray = [ // sample "U' D U U D2" = "U D'"
+  {"moveString":"U","moveAxis":"UD","moveSign":3},
+  {"moveString":"D","moveAxis":"UD","moveSign":1}, 
+  {"moveString":"U","moveAxis":"UD","moveSign":1},
+  {"moveString":"U","moveAxis":"UD","moveSign":1},
+  {"moveString":"D","moveAxis":"UD","moveSign":2}
+  ]
+){
+  //同じ回転軸のムーブを受け取って、符号の総和を計算して出力する
+  //入力は連想配列moveTypeの配列。[moveString,moveAxis,moveSign] //例 ["U","UD",1] ["F","FB",3]
+
+  //ムーブの文字でソート
+  moveTypeArray.sort(function(a,b){
+    return a.moveString < b.moveString ? 1 : -1;
+  });
+  
+  //符号の総和を計算する連想配列を定義
+  var totalSign = {};
+  
+  //ムーブの文字ごとに符号を計算
+  for (var i = 0, len= moveTypeArray.length; i < len; ++i) {
+    var targetString = moveTypeArray[i].moveString;
+    var targetSign   = moveTypeArray[i].moveSign;
+    totalSign[targetString] = !totalSign[targetString] ? targetSign : (totalSign[targetString]+targetSign) % 4;
+  }
+  
+  //中層回転は手数が削減される場合のみキャンセルする。M' R = Rw, Rw M' = Rw M'
+  //未実装
+  
+  //計算結果をalg配列として返す[
+  var totalSignOutput = [];
+  Object.keys(totalSign).forEach(function(moveString){
+    switch(this[moveString]){
+      case 0: break;
+      case 1: totalSignOutput.push(moveString);break;
+      case 2: totalSignOutput.push(moveString+"2");break;
+      case 3: totalSignOutput.push(moveString+"'");break;
+    }    
+  }, totalSign);
+  
+  
+  
+  //debug_output
+  //SignOutput = totalSign.U + "\\n" + totalSign.D + "\\n" + totalSignOutput;
+  //showOutputString(SignOutput); 
+  return totalSignOutput;
+}
+
+function recur_cancel(alg="U D U U D R x x' R' F F' F M' Rw U R U M' Rw"){
   //入力した文字列に対して再帰的にキャンセル処理をする。
   alg_array = alg.split(" ");
-  re_move = /[UDFBLRwxyzudfblr]{1,2}/;
   reset_flag = 0;
   
+  var len = alg_array.length;
+  
+  //algが2手に満たない場合、キャンセルの必要がないので終了する
+  if(len<2) return alg_array.join(" ");
+    
   //すべてのムーブを順に走査する。
-  for (var i = 0, len = alg_array.length; i < len-1; ++i) {
+  for (var i = 0; i < len-1; ++i) {
     Logger.log("alg_array:",alg_array);
     Logger.log("target move, i = :",alg_array[i], i);
 
     // ムーブの情報を取得する。
     var targetMove = getMoveType(alg_array[i]);   //1つ目のムーブの情報を取得
-    var nextMove   = getMoveType(alg_array[i+1]); //2つ目のムーブの情報を取得
-
+    
+    // 持ち替え記号はキャンセルしない
+    if(targetMove.isRotation) continue;
+    
     // 後続のムーブと回転軸が一致するかを確認する。
-    if (targetMove.moveAxis==nextMove.moveAxis){//後のムーブの回転軸が一致するならば
-      //残りの連続するムーブに回転軸が異なる手順が出現するまで走査する
-      var scanAxis = "";
-      for (var j = i+2, len = alg_array.length; j < len; ++j) {
-        if(getMoveType(alg_array[j]).moveAxis != targetMove.moveAxis) break;
-      }//breakしたとき、i～j-1まで符号が一致したことを示す
+    for (var j = i+1; j < len; ++j) {
+      //回転軸が異なるムーブが出現したらループを抜ける [i]～[j-1]までが連続している。
+      //後続のすべてのムーブの回転軸が同じである場合にはループが自然に終わる。[i]～[len-1]までが連続している。
+      //持ち替え記号はキャンセルに含まない
+      if(getMoveType(alg_array[j]).moveAxis != targetMove.moveAxis || getMoveType(alg_array[j]).isRotation) break;
     }
     
-    // 後続のムーブと回転面が一致するかを確認する。
-    if (targetMove.moveString==nextMove.moveString){//後のムーブの回転面が一致するならば
-      Logger.log("match! moveType: ", targetMove.moveString);
-
-      //符号を計算する
-      var totalSign = targetMove.moveSign + nextMove.moveSign;
-      Logger.log("sign:",totalSign);
-      switch(totalSign % 4){
-        case 1:
-          alg_array[i] = targetMove.moveString; // U
-          alg_array.splice(i+1,1);//i+1を削除
-          i-=1;//配列のイテレータを1つ戻す
-          break;
-        case 2:
-          alg_array[i] = targetMove.moveString + "2" ; // U2
-          alg_array.splice(i+1,1);//i+1を削除
-          i-=1;//配列のイテレータを1つ戻す
-          break;
-        case 3:
-          alg_array[i] = targetMove.moveString + "'" ; // U'
-          alg_array.splice(i+1,1);//i+1を削除
-          i-=1;//配列のイテレータを1つ戻す
-          len = alg_array.length;
-          break;
-        case 0:
-          alg_array.splice(i,2);//2つとも削除
-          i-=1;//配列のイテレータを2つ戻す
-          break;
-        default:
-      }
+    Logger.log("breakpoint:",i,j,alg_array.slice(i,j));
     
-    
-    len = alg_array.length;//配列の長さを再計算
-    reset_flag = 1;//リセットフラグを立てる
-    }//if end
-    
-    //最後に達したとき、リセットフラグが立っているならば、最初から配列を走査する
-    if(i==len-2 && reset_flag==1) {
-      Logger.log("reset!");
-      i=0;
-      reset_flag=0;
+    //回転軸が一致するムーブがあるなら、処理を継続する。
+    if(i != j-1) {
+      var replaceLen = j - i;
+      var targetArray = alg_array.slice(i,j).map(x => getMoveType(x));
+            
+      //先行するムーブ
+      preArray = alg_array.slice(0,i);
+      //置換した後のムーブ。空となる場合もある。
+      replacedArray = calcTotalSign(targetArray);
+      //後続するムーブ
+      postArray = alg_array.slice(j);
+      //キャンセルした部分を除いて、新しい配列を生成する
+      alg_array = preArray.concat(replacedArray,postArray);
+      
+      //イテレータを増加あるいは初期化
+      replaceLenAfter = replacedArray.length;
+      Logger.log("replaceLen,replaceLenAfter",replaceLen, replaceLenAfter);
+      i += replaceLenAfter -1;
+      
+      //配列の長さを再計算
+      len = alg_array.length;
+      
+      //Logger.log("preArray",preArray);
+      //Logger.log("replacedArray",replacedArray);
+      //Logger.log("postArray",postArray);
+      //Logger.log("output",alg_array);
+      
     }
-    
   }//for end
-  DecompressedOutput = "Original, Decompressed :\\n"+alg+"\\n"+alg_array.join(" ");
-  showOutputString(DecompressedOutput); 
+
+  //debug_output
+  //DecompressedOutput = "Original, Decompressed :\\n"+alg+"\\n"+alg_array.join(" ");
+  //showOutputString(DecompressedOutput); 
   return alg_array.join(" ");
 }
